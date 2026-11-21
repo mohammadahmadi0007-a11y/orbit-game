@@ -81,6 +81,8 @@ canvas{display:block;width:100%;height:100%}
 <script>
 const DB="https://kido-db.mohammadahmadi0007.workers.dev/orbit_lb.json";
 const BOT_LINK="https://ble.ir/orbit_pro_game_bot";
+const CHANNEL_ID="@gamee_balee";
+
 let usr={id:localStorage.getItem("orb_uid")||("u_"+Math.floor(1e5+Math.random()*9e5)),name:"بازیکن مهمان",photo:""};
 localStorage.setItem("orb_uid",usr.id);
 try{
@@ -215,7 +217,7 @@ requestAnimationFrame(loop);
 syncLB(0);loop();
 
 function shareScore(){
-const txt=`🛸 رکورد من در بازی ORBIT PRO شد: ${best} امتیاز!\nمی‌تونی رکوردم رو بزنی؟ 👇`;
+const txt=`🛸 رکورد من در بازی ORBIT PRO شد: ${best} امتیاز!\nمی‌تونی رکوردم رو بزنی؟ 👇\n\n🎮 بازی‌های بیشتر و چالش‌های روزانه در کانال ما:\n${CHANNEL_ID} | https://ble.ir/gamee_balee`;
 const shareUrl=`https://ble.ir/share/url?url=${encodeURIComponent(BOT_LINK)}&text=${encodeURIComponent(txt)}`;
 if(window.Bale&&Bale.WebApp&&Bale.WebApp.openLink){
 Bale.WebApp.openLink(shareUrl);
