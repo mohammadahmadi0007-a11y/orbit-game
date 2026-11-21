@@ -19,9 +19,14 @@ canvas{display:block;width:100%;height:100%}
 .sub{font-size:12px;color:#cbd5e1;margin-bottom:16px;text-align:center}
 .card{width:100%;max-width:350px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:12px;margin-bottom:16px}
 .card-title{font-size:13px;font-weight:bold;color:#fbbf24;margin-bottom:8px;display:flex;justify-content:space-between}
-.lb-list{max-height:190px;overflow-y:auto}
-.lb-row{display:flex;justify-content:space-between;padding:7px 8px;border-radius:8px;margin-bottom:4px;background:rgba(255,255,255,.04);font-size:13px}
+.lb-list{max-height:200px;overflow-y:auto}
+.lb-row{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:10px;margin-bottom:5px;background:rgba(255,255,255,.04);font-size:13px}
 .lb-row.me{background:rgba(163,230,53,.18);border:1px solid #a3e635}
+.lb-user{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.lb-rank{width:24px;font-weight:900;text-align:center;flex-shrink:0}
+.av{width:30px;height:30px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-weight:900;font-size:13px;color:#fff;flex-shrink:0;overflow:hidden;border:1.5px solid rgba(255,255,255,.25)}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.lb-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:bold}
 .btn{width:100%;max-width:350px;padding:14px;border:none;border-radius:14px;font-size:16px;font-weight:900;cursor:pointer;margin-bottom:10px}
 .btn-play{background:linear-gradient(135deg,#84cc16,#10b981);color:#090614}
 .btn-share{background:rgba(255,255,255,.12);color:#fff;font-size:13px}
@@ -78,14 +83,31 @@ canvas{display:block;width:100%;height:100%}
 
 <script>
 const DB="https://kido-db.mohammadahmadi0007.workers.dev/orbit_lb.json";
-let usr={id:localStorage.getItem("orb_uid")||("u_"+Math.floor(1e5+Math.random()*9e5)),name:"بازیکن مهمان"};
+let usr={id:localStorage.getItem("orb_uid")||("u_"+Math.floor(1e5+Math.random()*9e5)),name:"بازیکن مهمان",photo:""};
 localStorage.setItem("orb_uid",usr.id);
 try{
 const raw=(location.hash||"")+"&"+(location.search||"");
 const m=raw.match(/(?:tgWebAppData|baleWebAppData)=([^&]+)/);
-if(m&&m[1]){const u=JSON.parse(new URLSearchParams(decodeURIComponent(m[1])).get("user"));if(u&&u.id){usr.id="b_"+u.id;usr.name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"کاربر بله"}}
-if(window.Bale&&Bale.WebApp){Bale.WebApp.ready();Bale.WebApp.expand();const u=Bale.WebApp.initDataUnsafe&&Bale.WebApp.initDataUnsafe.user;if(u&&u.id){usr.id="b_"+u.id;usr.name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"کاربر بله"}}
+if(m&&m[1]){const u=JSON.parse(new URLSearchParams(decodeURIComponent(m[1])).get("user"));if(u&&u.id){usr.id="b_"+u.id;usr.name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"کاربر بله";if(u.photo_url)usr.photo=u.photo_url}}
+if(window.Bale&&Bale.WebApp){Bale.WebApp.ready();Bale.WebApp.expand();const u=Bale.WebApp.initDataUnsafe&&Bale.WebApp.initDataUnsafe.user;if(u&&u.id){usr.id="b_"+u.id;usr.name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"کاربر بله";if(u.photo_url)usr.photo=u.photo_url}}
 }catch(e){}
+
+const AV_GRADS=[
+"linear-gradient(135deg,#06b6d4,#3b82f6)",
+"linear-gradient(135deg,#ec4899,#8b5cf6)",
+"linear-gradient(135deg,#f59e0b,#ef4444)",
+"linear-gradient(135deg,#10b981,#059669)",
+"linear-gradient(135deg,#6366f1,#a855f7)"
+];
+function getAvatar(p){
+let sum=0;for(let i=0;i<p.id.length;i++)sum+=p.id.charCodeAt(i);
+const bg=AV_GRADS[sum%AV_GRADS.length];
+const letter=(p.name||"؟").trim().charAt(0);
+if(p.photo){
+return `<div class="av" style="background:${bg}"><img src="${p.photo}" onerror="this.remove()"></div>`;
+}
+return `<div class="av" style="background:${bg}">${letter}</div>`;
+}
 
 let best=parseInt(localStorage.getItem("orb_best")||"0",10),lb=[];
 document.getElementById("hud-best").innerText=best;
@@ -95,15 +117,18 @@ async function syncLB(sc){
 try{
 const r=await fetch(DB);let d=await r.json();if(!Array.isArray(d))d=[];
 const i=d.findIndex(x=>x.id===usr.id);
-if(i>-1){if(sc>d[i].score)d[i].score=sc;if(usr.name!=="بازیکن مهمان")d[i].name=usr.name;if(d[i].score>best){best=d[i].score;localStorage.setItem("orb_best",best)}}
-else if(sc>0){d.push({id:usr.id,name:usr.name,score:sc})}
+if(i>-1){if(sc>d[i].score)d[i].score=sc;if(usr.name!=="بازیکن مهمان")d[i].name=usr.name;if(usr.photo)d[i].photo=usr.photo;if(d[i].score>best){best=d[i].score;localStorage.setItem("orb_best",best)}}
+else if(sc>0){d.push({id:usr.id,name:usr.name,photo:usr.photo,score:sc})}
 d.sort((a,b)=>b.score-a.score);d=d.slice(0,25);lb=d;
 if(sc>0)await fetch(DB,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)});
 }catch(e){}
 document.getElementById("hud-best").innerText=best;
 const rk=lb.findIndex(x=>x.id===usr.id);
 document.getElementById("my-rank").innerText=rk>-1?`رتبه شما: #${rk+1}`:"";
-const h=lb.length?lb.slice(0,10).map((p,idx)=>`<div class="lb-row ${p.id===usr.id?'me':''}"><span>${idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'#'+(idx+1)} ${p.name}</span><strong style="color:#a3e635">${p.score}</strong></div>`).join(""):"<div style='text-align:center;color:#94a3b8;font-size:12px;padding:10px'>اولین نفر باش و رکورد بزن!</div>";
+const h=lb.length?lb.slice(0,10).map((p,idx)=>{
+const medal=idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'#'+(idx+1);
+return `<div class="lb-row ${p.id===usr.id?'me':''}"><div class="lb-user"><span class="lb-rank">${medal}</span>${getAvatar(p)}<span class="lb-name">${p.name}</span></div><strong style="color:#a3e635;margin-right:8px">${p.score}</strong></div>`;
+}).join(""):"<div style='text-align:center;color:#94a3b8;font-size:12px;padding:10px'>اولین نفر باش و رکورد بزن!</div>";
 document.getElementById("lb-start").innerHTML=h;document.getElementById("lb-over").innerHTML=h;
 }
 
@@ -170,11 +195,9 @@ document.getElementById("end-score").innerText=score;document.getElementById("en
 setTimeout(()=>{document.getElementById("over-screen").classList.remove("hd");syncLB(score)},400);
 }
 
-// رسم سفینه دقیقاً مشابه شکل سفید/سبز GAMEE روی مدار
 function drawGameeShip(x,y,a,d){
 ctx.save();
 ctx.translate(x,y);
-// نوک سفینه کاملاً مماس با دایره مدار و رو به جهت حرکت
 ctx.rotate(a+(d===1?Math.PI:0));
 ctx.fillStyle="#ffffff";
 ctx.strokeStyle="#0f172a";
@@ -186,7 +209,6 @@ ctx.quadraticCurveTo(0,11,-10,7);
 ctx.closePath();
 ctx.fill();
 ctx.stroke();
-// بخش سبز و تیره وسط سفینه
 ctx.fillStyle="#84cc16";
 ctx.beginPath();
 ctx.moveTo(0,-7);
@@ -225,97 +247,11 @@ beep(650+(score%12)*30,.06);
 }
 }
 });
-// فلش سفید و ریست الماس‌ها دقیقاً مثل ویدیو بعد از جمع شدن کل حلقه
 if(rem===0){
 flashAlpha=0.85;
 mkGems();
 beep(920,.16);
 }
 
-// پرتاب پیوسته و رنگارنگ توپ‌ها با افزایش تدریجی سرعت
 tmr++;
-const spawnRate=Math.max(18,34-Math.floor(score*0.35));
-if(tmr>=spawnRate){
-tmr=0;
-const bSpd=Math.min(7.2,2.9+score*0.045);
-const targetA=ang+(Math.random()*1.2-0.3)*dir;
-const col=COLORS[Math.floor(Math.random()*COLORS.length)];
-buls.push({a:targetA,d:28,s:bSpd,col});
-if(score>=20&&Math.random()<0.4){
-const col2=COLORS[Math.floor(Math.random()*COLORS.length)];
-buls.push({a:targetA+(Math.random()>0.5?0.85:-0.85),d:28,s:bSpd*0.9,col:col2});
-}
-pulse=0.85;
-}
-
-for(let i=buls.length-1;i>=0;i--){
-const b=buls[i];b.d+=b.s;
-const bx=CX+Math.cos(b.a)*b.d,by=CY+Math.sin(b.a)*b.d;
-if(Math.hypot(bx-sx,by-sy)<14){over();break}
-if(b.d>Math.max(W,H)*0.75)buls.splice(i,1);
-}
-}
-
-// سیاره بنفش بزرگ داخل مدار با دهانه‌ها
-ctx.fillStyle="#28164a";ctx.beginPath();ctx.arc(CX,CY,R*0.66,0,6.28);ctx.fill();
-ctx.fillStyle="#21113d";
-craters.forEach(c=>{ctx.beginPath();ctx.arc(CX+c.dx,CY+c.dy,c.r,0,6.28);ctx.fill()});
-
-// خط مدار
-ctx.strokeStyle="#d6c596";ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(CX,CY,R,0,6.28);ctx.stroke();
-
-// حلقه‌های مرکزی (نارنجی، زرد، سبز، تیره) دقیقاً شبیه ویدیو
-const p=pulse*3.5;
-ctx.fillStyle="#c2410c";ctx.beginPath();ctx.arc(CX,CY,35+p,0,6.28);ctx.fill();
-ctx.fillStyle="#f97316";ctx.beginPath();ctx.arc(CX,CY,26+p*0.7,0,6.28);ctx.fill();
-ctx.fillStyle="#84cc16";ctx.beginPath();ctx.arc(CX,CY,16+p*0.4,0,6.28);ctx.fill();
-ctx.fillStyle="#1e1b4b";ctx.beginPath();ctx.arc(CX,CY,7.5,0,6.28);ctx.fill();
-
-// ۲۸ الماس لوزی سفید روی مدار
-gems.forEach(g=>{
-if(!g.ok){
-const gx=CX+Math.cos(g.a)*R,gy=CY+Math.sin(g.a)*R;
-ctx.save();ctx.translate(gx,gy);ctx.rotate(g.a+Math.PI/4);
-ctx.fillStyle="#ffffff";ctx.fillRect(-3.4,-3.4,6.8,6.8);
-ctx.restore();
-}
-});
-
-// گوی‌های رنگارنگ دنباله‌دار
-buls.forEach(b=>{
-const bx=CX+Math.cos(b.a)*b.d,by=CY+Math.sin(b.a)*b.d;
-const tx=CX+Math.cos(b.a)*Math.max(18,b.d-28),ty=CY+Math.sin(b.a)*Math.max(18,b.d-28);
-const grd=ctx.createLinearGradient(tx,ty,bx,by);
-grd.addColorStop(0,b.col.tail);grd.addColorStop(1,b.col.head);
-ctx.strokeStyle=grd;ctx.lineWidth=11;ctx.lineCap="round";
-ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(bx,by);ctx.stroke();
-ctx.fillStyle=b.col.head;ctx.beginPath();ctx.arc(bx,by,5.5,0,6.28);ctx.fill();
-});
-
-// سفینه بازیکن
-if(st!=="over"){
-drawGameeShip(CX+Math.cos(ang)*R,CY+Math.sin(ang)*R,ang,dir);
-}
-
-// ذرات
-parts.forEach((pt,i)=>{
-pt.x+=pt.vx;pt.y+=pt.vy;pt.l-=0.04;
-ctx.fillStyle=pt.c;ctx.globalAlpha=Math.max(0,pt.l);
-ctx.beginPath();ctx.arc(pt.x,pt.y,2.8,0,6.28);ctx.fill();
-if(pt.l<=0)parts.splice(i,1);
-});
-ctx.globalAlpha=1;
-
-// افکت فلش سفید صفحه هنگام شروع و تکمیل دور
-if(flashAlpha>0){
-ctx.fillStyle=`rgba(255,255,255,${flashAlpha})`;
-ctx.fillRect(0,0,W,H);
-}
-
-requestAnimationFrame(loop);
-}
-syncLB(0);loop();
-function shareScore(){const t=`🛸 رکورد من در بازی ORBIT PRO شد: ${best} امتیاز!\nمی‌تونی رکوردم رو بزنی؟ 👇`;if(navigator.clipboard)navigator.clipboard.writeText(t);toast("متن کل‌کل کپی شد!")}
-</script>
-</body>
-</html>
+const spawnRate=Math.max
