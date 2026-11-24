@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>ORBIT PRO</title>
-<script src="https://tapi.bale.ai/miniapp.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-tap-highlight-color:transparent;font-family:Tahoma,sans-serif}
 html,body{width:100%;height:100%;background:#130b24;color:#fff;overflow:hidden}
@@ -57,7 +56,7 @@ canvas{display:block;width:100%;height:100%}
 <div class="card-title"><span>🏆 برترین رکوردهای بازیکنان</span><span id="my-rank" style="color:#fff;font-size:11px"></span></div>
 <div class="lb-list" id="lb-start">در حال دریافت...</div>
 </div>
-<button class="btn btn-play" onclick="startGame()">شروع بازی</button>
+<button class="btn btn-play" id="btn-start" onclick="startGame()">شروع بازی</button>
 <div class="brand-tag" onclick="openChannel()">🎮 اختصاصی کانال <b>@gamee_balee</b></div>
 </div>
 
@@ -94,17 +93,22 @@ function openChannel(){
   else window.open(CHANNEL_URL,"_blank");
 }
 
-let savedUid=localStorage.getItem("game_global_uid");
-if(!savedUid){
-  savedUid="u_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  localStorage.setItem("game_global_uid",savedUid);
+let savedUid=null;
+try{
+  savedUid=localStorage.getItem("game_global_uid");
+  if(!savedUid){
+    savedUid="u_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    localStorage.setItem("game_global_uid",savedUid);
+  }
+}catch(e){
+  savedUid="u_"+Math.floor(1e5+Math.random()*9e5);
 }
 
-let usr={
-  id:savedUid,
-  name:localStorage.getItem("game_global_name")||"بازیکن مهمان",
-  photo:localStorage.getItem("game_global_photo")||""
-};
+let usr={id:savedUid,name:"بازیکن مهمان",photo:""};
+try{
+  usr.name=localStorage.getItem("game_global_name")||"بازیکن مهمان";
+  usr.photo=localStorage.getItem("game_global_photo")||"";
+}catch(e){}
 
 function detectBaleUser(){
   try{
@@ -122,9 +126,11 @@ function detectBaleUser(){
       const fullName=[u.first_name,u.last_name].filter(Boolean).join(" ").trim();
       if(fullName)usr.name=fullName;
       if(u.photo_url)usr.photo=u.photo_url;
-      localStorage.setItem("game_global_uid",usr.id);
-      localStorage.setItem("game_global_name",usr.name);
-      if(usr.photo)localStorage.setItem("game_global_photo",usr.photo);
+      try{
+        localStorage.setItem("game_global_uid",usr.id);
+        localStorage.setItem("game_global_name",usr.name);
+        if(usr.photo)localStorage.setItem("game_global_photo",usr.photo);
+      }catch(e){}
     }
   }catch(e){}
 }
@@ -137,7 +143,8 @@ function avHtml(p){
   return p.photo?`<div class="av" style="background:${bg}"><img src="${p.photo}" onerror="this.parentNode.innerText='${ch}'"></div>`:`<div class="av" style="background:${bg}">${ch}</div>`;
 }
 
-let best=parseInt(localStorage.getItem("orb_best")||"0",10),lb=[];
+let best=0,lb=[];
+try{best=parseInt(localStorage.getItem("orb_best")||"0",10)||0;}catch(e){}
 document.getElementById("hud-best").innerText=best;
 function toast(m){const t=document.getElementById("toast");t.innerText=m;t.style.opacity="1";setTimeout(()=>t.style.opacity="0",2200)}
 
@@ -160,7 +167,7 @@ async function syncLB(sc){
       if(finalScore>d[i].score){d[i].score=finalScore;changed=true;}
       if(usr.name!=="بازیکن مهمان"&&d[i].name!==usr.name){d[i].name=usr.name;changed=true;}
       if(usr.photo&&d[i].photo!==usr.photo){d[i].photo=usr.photo;changed=true;}
-      if(d[i].score>best){best=d[i].score;localStorage.setItem("orb_best",best);}
+      if(d[i].score>best){best=d[i].score;try{localStorage.setItem("orb_best",best);}catch(e){}}
     }else if(finalScore>0){
       d.push({id:usr.id,name:usr.name,photo:usr.photo,score:finalScore});
       changed=true;
@@ -224,7 +231,7 @@ dir*=-1;pulse=0.7;beep(dir===1?460:370,.06);
 
 function over(){
 st="over";beep(150,.32,"sawtooth");boom(CX+Math.cos(ang)*R,CY+Math.sin(ang)*R,"#f43f5e",28);
-if(score>best){best=score;localStorage.setItem("orb_best",best)}
+if(score>best){best=score;try{localStorage.setItem("orb_best",best)}catch(e){}}
 document.getElementById("end-score").innerText=score;document.getElementById("end-best").innerText=best;
 setTimeout(()=>{document.getElementById("over-screen").classList.remove("hd");syncLB(score)},400);
 }
@@ -312,5 +319,6 @@ window.open(shareUrl,"_blank");
 }
 }
 </script>
+<script src="https://tapi.bale.ai/miniapp.js" async onload="syncLB(0)"></script>
 </body>
 </html>
