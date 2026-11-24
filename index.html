@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>ORBIT PRO</title>
+<script src="https://tapi.bale.ai/miniapp.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-tap-highlight-color:transparent;font-family:Tahoma,sans-serif}
 html,body{width:100%;height:100%;background:#130b24;color:#fff;overflow:hidden}
@@ -89,24 +90,51 @@ const CHANNEL_ID="@gamee_balee";
 const CHANNEL_URL="https://ble.ir/gamee_balee";
 
 function openChannel(){
-if(window.Bale&&Bale.WebApp&&Bale.WebApp.openLink)Bale.WebApp.openLink(CHANNEL_URL);
-else window.open(CHANNEL_URL,"_blank");
+  if(window.Bale&&Bale.WebApp&&Bale.WebApp.openLink)Bale.WebApp.openLink(CHANNEL_URL);
+  else window.open(CHANNEL_URL,"_blank");
 }
 
-let usr={id:localStorage.getItem("orb_uid")||("u_"+Math.floor(1e5+Math.random()*9e5)),name:"بازیکن مهمان",photo:""};
-localStorage.setItem("orb_uid",usr.id);
-try{
-const raw=(location.hash||"")+"&"+(location.search||"");
-const m=raw.match(/(?:tgWebAppData|baleWebAppData)=([^&]+)/);
-if(m&&m[1]){const u=JSON.parse(new URLSearchParams(decodeURIComponent(m[1])).get("user"));if(u&&u.id){usr.id="b_"+u.id;usr.name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"کاربر بله";if(u.photo_url)usr.photo=u.photo_url}}
-if(window.Bale&&Bale.WebApp){Bale.WebApp.ready();Bale.WebApp.expand();const u=Bale.WebApp.initDataUnsafe&&Bale.WebApp.initDataUnsafe.user;if(u&&u.id){usr.id="b_"+u.id;usr.name=[u.first_name,u.last_name].filter(Boolean).join(" ")||"کاربر بله";if(u.photo_url)usr.photo=u.photo_url}}
-}catch(e){}
+let savedUid=localStorage.getItem("game_global_uid");
+if(!savedUid){
+  savedUid="u_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  localStorage.setItem("game_global_uid",savedUid);
+}
+
+let usr={
+  id:savedUid,
+  name:localStorage.getItem("game_global_name")||"بازیکن مهمان",
+  photo:localStorage.getItem("game_global_photo")||""
+};
+
+function detectBaleUser(){
+  try{
+    const raw=(location.hash||"")+"&"+(location.search||"");
+    const m=raw.match(/(?:tgWebAppData|baleWebAppData)=([^&]+)/);
+    let u=null;
+    if(m&&m[1])u=JSON.parse(new URLSearchParams(decodeURIComponent(m[1])).get("user"));
+    if(window.Bale&&Bale.WebApp){
+      Bale.WebApp.ready();
+      Bale.WebApp.expand();
+      if(Bale.WebApp.initDataUnsafe&&Bale.WebApp.initDataUnsafe.user)u=Bale.WebApp.initDataUnsafe.user;
+    }
+    if(u&&u.id){
+      usr.id="b_"+u.id;
+      const fullName=[u.first_name,u.last_name].filter(Boolean).join(" ").trim();
+      if(fullName)usr.name=fullName;
+      if(u.photo_url)usr.photo=u.photo_url;
+      localStorage.setItem("game_global_uid",usr.id);
+      localStorage.setItem("game_global_name",usr.name);
+      if(usr.photo)localStorage.setItem("game_global_photo",usr.photo);
+    }
+  }catch(e){}
+}
+detectBaleUser();
 
 const GRADS=["linear-gradient(135deg,#06b6d4,#3b82f6)","linear-gradient(135deg,#ec4899,#8b5cf6)","linear-gradient(135deg,#f59e0b,#ef4444)","linear-gradient(135deg,#10b981,#059669)","linear-gradient(135deg,#6366f1,#a855f7)"];
 function avHtml(p){
-let s=0;for(let i=0;i<p.id.length;i++)s+=p.id.charCodeAt(i);
-const bg=GRADS[s%GRADS.length],ch=(p.name||"؟").trim().charAt(0);
-return p.photo?`<div class="av" style="background:${bg}"><img src="${p.photo}" onerror="this.parentNode.innerText='${ch}'"></div>`:`<div class="av" style="background:${bg}">${ch}</div>`;
+  let s=0;for(let i=0;i<p.id.length;i++)s+=p.id.charCodeAt(i);
+  const bg=GRADS[s%GRADS.length],ch=(p.name||"؟").trim().charAt(0);
+  return p.photo?`<div class="av" style="background:${bg}"><img src="${p.photo}" onerror="this.parentNode.innerText='${ch}'"></div>`:`<div class="av" style="background:${bg}">${ch}</div>`;
 }
 
 let best=parseInt(localStorage.getItem("orb_best")||"0",10),lb=[];
@@ -114,19 +142,42 @@ document.getElementById("hud-best").innerText=best;
 function toast(m){const t=document.getElementById("toast");t.innerText=m;t.style.opacity="1";setTimeout(()=>t.style.opacity="0",2200)}
 
 async function syncLB(sc){
-try{
-const r=await fetch(DB);let d=await r.json();if(!Array.isArray(d))d=[];
-const i=d.findIndex(x=>x.id===usr.id);
-if(i>-1){if(sc>d[i].score)d[i].score=sc;if(usr.name!=="بازیکن مهمان")d[i].name=usr.name;if(usr.photo)d[i].photo=usr.photo;if(d[i].score>best){best=d[i].score;localStorage.setItem("orb_best",best)}}
-else if(sc>0){d.push({id:usr.id,name:usr.name,photo:usr.photo,score:sc})}
-d.sort((a,b)=>b.score-a.score);d=d.slice(0,25);lb=d;
-if(sc>0)await fetch(DB,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)});
-}catch(e){}
-document.getElementById("hud-best").innerText=best;
-const rk=lb.findIndex(x=>x.id===usr.id);
-document.getElementById("my-rank").innerText=rk>-1?`رتبه شما: #${rk+1}`:"";
-const h=lb.length?lb.slice(0,10).map((p,idx)=>`<div class="lb-row ${p.id===usr.id?'me':''}"><div class="lb-user"><span style="width:22px;font-weight:900">${idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'#'+(idx+1)}</span>${avHtml(p)}<span class="lb-name">${p.name}</span></div><strong style="color:#a3e635;margin-right:6px">${p.score}</strong></div>`).join(""):"<div style='text-align:center;color:#94a3b8;font-size:12px;padding:10px'>اولین نفر باش و رکورد بزن!</div>";
-document.getElementById("lb-start").innerHTML=h;document.getElementById("lb-over").innerHTML=h;
+  detectBaleUser();
+  try{
+    const r=await fetch(DB+"?t="+Date.now());
+    let d=await r.json();
+    if(!Array.isArray(d))d=[];
+    const map=new Map();
+    for(const item of d){
+      if(!item||!item.id)continue;
+      if(!map.has(item.id)||item.score>map.get(item.id).score)map.set(item.id,item);
+    }
+    d=Array.from(map.values());
+    const finalScore=Math.max(sc||0,best);
+    const i=d.findIndex(x=>x.id===usr.id);
+    let changed=false;
+    if(i>-1){
+      if(finalScore>d[i].score){d[i].score=finalScore;changed=true;}
+      if(usr.name!=="بازیکن مهمان"&&d[i].name!==usr.name){d[i].name=usr.name;changed=true;}
+      if(usr.photo&&d[i].photo!==usr.photo){d[i].photo=usr.photo;changed=true;}
+      if(d[i].score>best){best=d[i].score;localStorage.setItem("orb_best",best);}
+    }else if(finalScore>0){
+      d.push({id:usr.id,name:usr.name,photo:usr.photo,score:finalScore});
+      changed=true;
+    }
+    d.sort((a,b)=>b.score-a.score);
+    d=d.slice(0,25);
+    lb=d;
+    if(changed){
+      await fetch(DB,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)});
+    }
+  }catch(e){}
+  document.getElementById("hud-best").innerText=best;
+  const rk=lb.findIndex(x=>x.id===usr.id);
+  document.getElementById("my-rank").innerText=rk>-1?`رتبه شما: #${rk+1}`:"";
+  const h=lb.length?lb.slice(0,10).map((p,idx)=>`<div class="lb-row ${p.id===usr.id?'me':''}"><div class="lb-user"><span style="width:22px;font-weight:900">${idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'#'+(idx+1)}</span>${avHtml(p)}<span class="lb-name">${p.name}</span></div><strong style="color:#a3e635;margin-right:6px">${p.score}</strong></div>`).join(""):"<div style='text-align:center;color:#94a3b8;font-size:12px;padding:10px'>اولین نفر باش و رکورد بزن!</div>";
+  document.getElementById("lb-start").innerHTML=h;
+  document.getElementById("lb-over").innerHTML=h;
 }
 
 let snd=true,ac=null;
