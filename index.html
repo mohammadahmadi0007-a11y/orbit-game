@@ -84,6 +84,7 @@ canvas{display:block;width:100%;height:100%}
 
 <script>
 const DB="https://kido-db.mohammadahmadi0007.workers.dev/orbit_lb.json";
+const LB_EPOCH="v2_2026_11_25";
 const BOT_LINK="https://ble.ir/orbit_pro_game_bot";
 const CHANNEL_ID="@gamee_balee";
 const CHANNEL_URL="https://ble.ir/gamee_balee";
@@ -145,47 +146,123 @@ function avHtml(p){
 }
 
 let best=0,lb=[];
-try{best=parseInt(localStorage.getItem("orb_best_"+usr.id)||localStorage.getItem("orb_best")||"0",10)||0;}catch(e){}
+try{best=parseInt(localStorage.getItem("orb_best_"+LB_EPOCH+"_"+usr.id)||"0",10)||0;}catch(e){}
 document.getElementById("hud-best").innerText=best;
 function toast(m){const t=document.getElementById("toast");t.innerText=m;t.style.opacity="1";setTimeout(()=>t.style.opacity="0",2200)}
 
-async function syncLB(sc){
-  detectBaleUser();
+async function pushLB(payload){
+  const bodyStr=JSON.stringify(payload);
   try{
-    const r=await fetch(DB+"?t="+Date.now());
-    let d=await r.json();
-    if(!Array.isArray(d))d=[];
-    const map=new Map();
-    for(const item of d){
-      if(!item||!item.id)continue;
-      if(!map.has(item.id)||item.score>map.get(item.id).score)map.set(item.id,item);
-    }
-    d=Array.from(map.values());
-    const finalScore=Math.max(sc||0,best);
-    const i=d.findIndex(x=>x.id===usr.id);
-    let changed=false;
-    if(i>-1){
-      if(finalScore>d[i].score){d[i].score=finalScore;changed=true;}
-      if(usr.name!=="بازیکن مهمان"&&d[i].name!==usr.name){d[i].name=usr.name;changed=true;}
-      if((d[i].photo||"")!==(usr.photo||"")){d[i].photo=usr.photo||"";changed=true;}
-      if(d[i].score>best){best=d[i].score;try{localStorage.setItem("orb_best_"+usr.id,best);}catch(e){}}
-    }else if(finalScore>0){
-      d.push({id:usr.id,name:usr.name,photo:usr.photo||"",score:finalScore});
-      changed=true;
-    }
-    d.sort((a,b)=>b.score-a.score);
-    d=d.slice(0,25);
-    lb=d;
-    if(changed){
-      await fetch(DB,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)});
-    }
+    const res=await fetch(DB,{
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body:bodyStr
+    });
+    if(res.ok)return true;
   }catch(e){}
-  document.getElementById("hud-best").innerText=best;
+  try{
+    const res2=await fetch(DB,{
+      method:"POST",
+      body:bodyStr
+    });
+    if(res2.ok)return true;
+  }catch(e){}
+  return false;
+}
+
+function renderLBHtml(){
   const rk=lb.findIndex(x=>x.id===usr.id);
   document.getElementById("my-rank").innerText=rk>-1?`رتبه شما: #${rk+1}`:"";
-  const h=lb.length?lb.slice(0,10).map((p,idx)=>`<div class="lb-row ${p.id===usr.id?'me':''}"><div class="lb-user"><span style="width:22px;font-weight:900">${idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'#'+(idx+1)}</span>${avHtml(p)}<span class="lb-name">${p.name}</span></div><strong style="color:#a3e635;margin-right:6px">${p.score}</strong></div>`).join(""):"<div style='text-align:center;color:#94a3b8;font-size:12px;padding:10px'>اولین نفر باش و رکورد بزن!</div>";
+  const h=lb.length?lb.slice(0,10).map((p,idx)=>`<div class="lb-row ${p.id===usr.id?'me':''}"><div class="lb-user"><span style="width:22px;font-weight:900">${idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'#'+(idx+1)}</span>${avHtml(p)}<span class="lb-name">${p.name}</span></div><strong style="color:#a3e635;margin-right:6px">${p.score}</strong></div>`).join(""):"<div style='text-align:center;color:#94a3b8;font-size:12px;padding:10px'>جدول ریست شده! اولین رکورد رو بزن!</div>";
   document.getElementById("lb-start").innerHTML=h;
   document.getElementById("lb-over").innerHTML=h;
+}
+
+async function syncLB(sc){
+  detectBaleUser();
+  const runScore=Number(sc)||0;
+  if(runScore>best){
+    best=runScore;
+    try{localStorage.setItem("orb_best_"+LB_EPOCH+"_"+usr.id,best);}catch(e){}
+  }
+  document.getElementById("hud-best").innerText=best;
+
+  let serverEntries=[];
+  let needReset=false;
+  let fetchOk=false;
+
+  try{
+    const r=await fetch(DB+"?t="+Date.now(),{cache:"no-store"});
+    if(r.ok){
+      const raw=await r.json();
+      fetchOk=true;
+      if(raw&&!Array.isArray(raw)&&raw.epoch===LB_EPOCH&&Array.isArray(raw.scores)){
+        serverEntries=raw.scores;
+      }else{
+        needReset=true;
+        serverEntries=[];
+      }
+    }
+  }catch(e){}
+
+  if(!fetchOk){
+    if(runScore>0){
+      lb=[{id:usr.id,name:usr.name,photo:usr.photo||"",score:best}];
+      renderLBHtml();
+      toast("⚠️ ارتباط با سرور برقرار نشد؛ امتیاز روی گوشی ذخیره شد");
+    }else if(!lb.length){
+      renderLBHtml();
+    }
+    return;
+  }
+
+  const map=new Map();
+  for(const item of serverEntries){
+    if(!item||!item.id)continue;
+    const prev=map.get(item.id);
+    if(!prev||Number(item.score)>Number(prev.score)){
+      map.set(item.id,{
+        id:String(item.id),
+        name:String(item.name||"کاربر بله"),
+        photo:String(item.photo||""),
+        score:Number(item.score)||0
+      });
+    }
+  }
+
+  let changed=needReset;
+  const existing=map.get(usr.id);
+  const targetScore=Math.max(runScore,best);
+
+  if(existing){
+    if(targetScore>existing.score){existing.score=targetScore;changed=true;}
+    if(usr.name!=="بازیکن مهمان"&&existing.name!==usr.name){existing.name=usr.name;changed=true;}
+    if((existing.photo||"")!==(usr.photo||"")){existing.photo=usr.photo||"";changed=true;}
+    if(existing.score>best){
+      best=existing.score;
+      try{localStorage.setItem("orb_best_"+LB_EPOCH+"_"+usr.id,best);}catch(e){}
+    }
+  }else if(targetScore>0){
+    map.set(usr.id,{
+      id:usr.id,
+      name:usr.name,
+      photo:usr.photo||"",
+      score:targetScore
+    });
+    changed=true;
+  }
+
+  const sorted=Array.from(map.values()).sort((a,b)=>b.score-a.score).slice(0,25);
+  lb=sorted;
+  document.getElementById("hud-best").innerText=best;
+  renderLBHtml();
+
+  if(changed){
+    const ok=await pushLB({epoch:LB_EPOCH,scores:sorted});
+    if(!ok&&runScore>0){
+      toast("⚠️ خطا در ارسال رکورد به سرور");
+    }
+  }
 }
 
 let snd=true,ac=null;
@@ -232,9 +309,9 @@ dir*=-1;pulse=0.7;beep(dir===1?460:370,.06);
 
 function over(){
 st="over";beep(150,.32,"sawtooth");boom(CX+Math.cos(ang)*R,CY+Math.sin(ang)*R,"#f43f5e",28);
-if(score>best){best=score;try{localStorage.setItem("orb_best_"+usr.id,best);localStorage.setItem("orb_best",best);}catch(e){}}
+if(score>best){best=score;try{localStorage.setItem("orb_best_"+LB_EPOCH+"_"+usr.id,best);}catch(e){}}
 document.getElementById("end-score").innerText=score;document.getElementById("end-best").innerText=best;
-setTimeout(()=>{document.getElementById("over-screen").classList.remove("hd");syncLB(score)},400);
+setTimeout(()=>{document.getElementById("over-screen").classList.remove("hd");syncLB(score)},350);
 }
 
 function loop(){
@@ -248,13 +325,14 @@ let rem=0;
 gems.forEach(g=>{if(!g.ok){rem++;if(Math.abs(norm(g.a-ang))<0.125){g.ok=true;score++;document.getElementById("hud-score").innerText=score;if(score>best)document.getElementById("hud-best").innerText=score;boom(CX+Math.cos(g.a)*R,CY+Math.sin(g.a)*R,"#fff",6);beep(650+(score%12)*30,.06)}}});
 if(rem===0){flash=0.8;mkGems();beep(920,.16)}
 tmr++;
-const spawnInterval=Math.max(36,64-Math.floor(score*0.22));
+const spawnInterval=Math.max(34,62-Math.floor(score*0.24));
 if(tmr>=spawnInterval){
 tmr=0;
-const bSpd=Math.min(4.4,1.65+score*0.018);
+// سرعت گوی‌ها خیلی خیلی کم نسبت به نسخه قبلی بیشتر شده است
+const bSpd=Math.min(4.75,1.8+score*0.021);
 const tA=ang+(Math.random()*1.5-0.45)*dir;
 buls.push({a:tA,d:28,s:bSpd,c:COLS[Math.floor(Math.random()*COLS.length)]});
-if(score>=45&&Math.random()<0.22)buls.push({a:tA+(Math.random()>0.5?1.15:-1.15),d:28,s:bSpd*0.85,c:COLS[Math.floor(Math.random()*COLS.length)]});
+if(score>=45&&Math.random()<0.24)buls.push({a:tA+(Math.random()>0.5?1.15:-1.15),d:28,s:bSpd*0.88,c:COLS[Math.floor(Math.random()*COLS.length)]});
 pulse=0.85;
 }
 for(let i=buls.length-1;i>=0;i--){
